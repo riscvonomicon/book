@@ -1,0 +1,13 @@
+[book]
+title = "Riscvonomicon"
+description = "Reference for using RISC-V in Rust"
+authors = ["Gijs Burghoorn"]
+language = "en"
+
+[output.html]
+site-url = "/riscvonomicon/"
+git-repository-url = "https://github.com/coastalwhite/riscvonomicon"
+edit-url-template = "https://github.com/coastalwhite/riscvonomicon/edit/main/{path}"
+
+[output.html.playground]
+line-numbers = true
