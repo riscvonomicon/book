@@ -1,4 +1,4 @@
-![Ferris holding a RISC-V logo](../assets/riscvonomicon.svg)
+![Ferris holding a RISC-V logo](/assets/riscvonomicon.svg)
 
 The Riscvonomicon (pronounced "risk five o-nomicon") provides a reference for
 using the [RISC-V] instruction set and the [Rust] programming language
