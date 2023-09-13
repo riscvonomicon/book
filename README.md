@@ -1,6 +1,6 @@
+<h1 align="center">Riscvonomicon</h1>
+<h4 align="center">A reference book for using RISC-V in Rust</h4>
 <p align="center">
-    <h1>Riscvonomicon</h2>
-    <h4>A reference book for using RISC-V in Rust</h4>
     <img
         width="400"
         src="./src/assets/riscvonomicon.svg"
