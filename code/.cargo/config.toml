@@ -1,0 +1,7 @@
+[target.riscv32imac-unknown-none-elf]
+rustflags = ['-Ctarget-feature=+zk,+crt-static']
+runner = "qemu-riscv32 -cpu rv32,zk=true"
+
+[target.riscv64gc-unknown-linux-gnu]
+rustflags = ['-Ctarget-feature=+zk,+crt-static']
+runner = "qemu-riscv64 -cpu rv32,zk=true"
