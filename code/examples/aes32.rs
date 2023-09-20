@@ -1,11 +1,12 @@
 #![no_std]
 #![no_main]
 
-use ralte32::{define_tests, println};
+use ralte32::{assert_eq, define_tests, println, Binary, Hex};
 
 use riscvonomicon_code_examples::zk::aes32::{
-    aes128, aes128_key_schedule, aes196, aes196_key_schedule, aes256, aes256_key_schedule,
-    AES128Key, AES196Key, AES256Key, Block, RoundKey,
+    aes128_decrypt, aes128_decrypt_key_schedule, aes128_encrypt, aes128_key_schedule,
+    aes196_encrypt, aes196_key_schedule, aes256_encrypt, aes256_key_schedule, AES128Key, AES196Key,
+    AES256Key, Block, RoundKey,
 };
 
 define_tests! {
@@ -19,18 +20,24 @@ fn test_aes128() {
     let pt = 0x00112233445566778899aabbccddeeffu128;
     let ck = 0x000102030405060708090a0b0c0d0e0fu128;
 
-    let ks = unsafe { aes128_key_schedule(AES128Key::from(ck.to_be_bytes())) };
+    let mut ks = unsafe { aes128_key_schedule(AES128Key::from(ck.to_be_bytes())) };
 
-    let ct = unsafe { aes128(Block::from(pt.to_be_bytes()), &ks) };
+    let ct = unsafe { aes128_encrypt(Block::from(pt.to_be_bytes()), &ks) };
 
     println!("----- ROUND KEYS -----");
     for k in &ks {
-        println!(u128::from_be_bytes(k.to_bytes()));
+        println!(Hex(u128::from_be_bytes(k.to_bytes())));
     }
     println!("-----  END KEYS  -----\n");
 
-    println!(u128::from_be_bytes(ct.to_bytes()));
     println!();
+
+    unsafe { aes128_decrypt_key_schedule(&mut ks) };
+
+    let pt = Block::from(pt.to_be_bytes());
+    let dt = unsafe { aes128_decrypt(ct, &ks) };
+
+    assert_eq!(pt, dt);
 }
 
 fn test_aes196() {
@@ -44,15 +51,15 @@ fn test_aes196() {
         ]))
     };
 
-    let ct = unsafe { aes196(Block::from(pt.to_be_bytes()), &ks) };
+    let ct = unsafe { aes196_encrypt(Block::from(pt.to_be_bytes()), &ks) };
 
     println!("----- ROUND KEYS -----");
     for k in &ks {
-        println!(u128::from_be_bytes(k.to_bytes()));
+        println!(Hex(u128::from_be_bytes(k.to_bytes())));
     }
     println!("-----  END KEYS  -----\n");
 
-    println!(u128::from_be_bytes(ct.to_bytes()));
+    println!(Hex(u128::from_be_bytes(ct.to_bytes())));
     println!();
 }
 
@@ -68,14 +75,14 @@ fn test_aes256() {
         ]))
     };
 
-    let ct = unsafe { aes256(Block::from(pt.to_be_bytes()), &ks) };
+    let ct = unsafe { aes256_encrypt(Block::from(pt.to_be_bytes()), &ks) };
 
     println!("----- ROUND KEYS -----");
     for k in &ks {
-        println!(u128::from_be_bytes(k.to_bytes()));
+        println!(Hex(u128::from_be_bytes(k.to_bytes())));
     }
     println!("-----  END KEYS  -----\n");
 
-    println!(u128::from_be_bytes(ct.to_bytes()));
+    println!(Hex(u128::from_be_bytes(ct.to_bytes())));
     println!();
 }

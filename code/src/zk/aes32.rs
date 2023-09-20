@@ -1,4 +1,4 @@
-use core::arch::riscv32::{aes32esi, aes32esmi};
+use core::arch::riscv32::{aes32dsi, aes32dsmi, aes32esi, aes32esmi};
 
 #[derive(Clone, Copy)]
 pub struct AES128Key(u32, u32, u32, u32);
@@ -6,9 +6,9 @@ pub struct AES128Key(u32, u32, u32, u32);
 pub struct AES196Key(u32, u32, u32, u32, u32, u32);
 #[derive(Clone)]
 pub struct AES256Key(u32, u32, u32, u32, u32, u32, u32, u32);
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Block(u32, u32, u32, u32);
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RoundKey(u32, u32, u32, u32);
 
 impl From<[u8; 16]> for AES128Key {
@@ -154,7 +154,6 @@ pub unsafe fn aes196_key_schedule(ck: AES196Key) -> [RoundKey; 13] {
         rk[i * 6 + 4] = t4;
         rk[i * 6 + 5] = t5;
 
-
         t0 ^= u32::from(RCON[i]);
         let tr = t5.rotate_right(8);
 
@@ -177,6 +176,37 @@ pub unsafe fn aes196_key_schedule(ck: AES196Key) -> [RoundKey; 13] {
 
     // SAFETY: We know that rk has 13 * 4 times a u32. So it has space for 13 RoundKeys
     unsafe { core::mem::transmute(rk) }
+}
+
+#[target_feature(enable = "zkn")]
+pub unsafe fn aes_decrypt_key_schedule<const KEYS: usize>(rk: &mut [RoundKey; KEYS]) {
+    #[target_feature(enable = "zkn")]
+    unsafe fn subkey(mut x: u32) -> u32 {
+        let mut y;
+
+        unsafe {
+            y = aes32esi(0, x, 0);
+            y = aes32esi(y, x, 1);
+            y = aes32esi(y, x, 2);
+            y = aes32esi(y, x, 3);
+
+            x = aes32dsmi(0, y, 0);
+            x = aes32dsmi(x, y, 1);
+            x = aes32dsmi(x, y, 2);
+            x = aes32dsmi(x, y, 3);
+        }
+
+        x
+    }
+
+    for k in &mut rk[1..KEYS - 1] {
+        unsafe {
+            k.0 = subkey(k.0);
+            k.1 = subkey(k.1);
+            k.2 = subkey(k.2);
+            k.3 = subkey(k.3);
+        }
+    }
 }
 
 #[target_feature(enable = "zkne")]
@@ -236,7 +266,7 @@ pub unsafe fn aes256_key_schedule(ck: AES256Key) -> [RoundKey; 15] {
 }
 
 #[target_feature(enable = "zkne")]
-unsafe fn aes_enc<const KEYS: usize>(block: Block, rk: &[RoundKey; KEYS]) -> Block {
+unsafe fn aes_encrypt<const KEYS: usize>(block: Block, rk: &[RoundKey; KEYS]) -> Block {
     let mut block = Block(
         block.0 ^ rk[0].0,
         block.1 ^ rk[0].1,
@@ -312,20 +342,133 @@ unsafe fn aes_enc<const KEYS: usize>(block: Block, rk: &[RoundKey; KEYS]) -> Blo
     Block(a0, a1, a2, a3)
 }
 
-#[target_feature(enable = "zkne")]
-pub unsafe fn aes128(block: Block, rk: &[RoundKey; 11]) -> Block {
-    // SAFETY: Same invariant as the parent function
-    unsafe { aes_enc::<11>(block, rk) }
+#[target_feature(enable = "zknd")]
+unsafe fn aes_decrypt<const KEYS: usize>(block: Block, rk: &[RoundKey; KEYS]) -> Block {
+    let mut block = Block(
+        block.0 ^ rk[KEYS - 1].0,
+        block.1 ^ rk[KEYS - 1].1,
+        block.2 ^ rk[KEYS - 1].2,
+        block.3 ^ rk[KEYS - 1].3,
+    );
+
+    let mut a0;
+    let mut a1;
+    let mut a2;
+    let mut a3;
+
+    for i in (1..KEYS - 1).rev() {
+        a0 = rk[i].0;
+        a1 = rk[i].1;
+        a2 = rk[i].2;
+        a3 = rk[i].3;
+
+        // SAFETY: We know that the `zknd` extension is available
+        unsafe {
+            a0 = aes32dsmi(a0, block.0, 0);
+            a0 = aes32dsmi(a0, block.3, 1);
+            a0 = aes32dsmi(a0, block.2, 2);
+            a0 = aes32dsmi(a0, block.1, 3);
+
+            a1 = aes32dsmi(a1, block.1, 0);
+            a1 = aes32dsmi(a1, block.0, 1);
+            a1 = aes32dsmi(a1, block.3, 2);
+            a1 = aes32dsmi(a1, block.2, 3);
+
+            a2 = aes32dsmi(a2, block.2, 0);
+            a2 = aes32dsmi(a2, block.1, 1);
+            a2 = aes32dsmi(a2, block.0, 2);
+            a2 = aes32dsmi(a2, block.3, 3);
+
+            a3 = aes32dsmi(a3, block.3, 0);
+            a3 = aes32dsmi(a3, block.2, 1);
+            a3 = aes32dsmi(a3, block.1, 2);
+            a3 = aes32dsmi(a3, block.0, 3);
+        }
+
+        block = Block(a0, a1, a2, a3);
+    }
+
+    a0 = rk[0].0;
+    a1 = rk[0].1;
+    a2 = rk[0].2;
+    a3 = rk[0].3;
+
+    // SAFETY: We know that the `zknd` extension is available
+    unsafe {
+        a0 = aes32dsi(a0, block.0, 0);
+        a0 = aes32dsi(a0, block.3, 1);
+        a0 = aes32dsi(a0, block.2, 2);
+        a0 = aes32dsi(a0, block.1, 3);
+
+        a1 = aes32dsi(a1, block.1, 0);
+        a1 = aes32dsi(a1, block.0, 1);
+        a1 = aes32dsi(a1, block.3, 2);
+        a1 = aes32dsi(a1, block.2, 3);
+
+        a2 = aes32dsi(a2, block.2, 0);
+        a2 = aes32dsi(a2, block.1, 1);
+        a2 = aes32dsi(a2, block.0, 2);
+        a2 = aes32dsi(a2, block.3, 3);
+
+        a3 = aes32dsi(a3, block.3, 0);
+        a3 = aes32dsi(a3, block.2, 1);
+        a3 = aes32dsi(a3, block.1, 2);
+        a3 = aes32dsi(a3, block.0, 3);
+    }
+
+    Block(a0, a1, a2, a3)
 }
 
 #[target_feature(enable = "zkne")]
-pub unsafe fn aes196(block: Block, rk: &[RoundKey; 13]) -> Block {
+pub unsafe fn aes128_encrypt(block: Block, rk: &[RoundKey; 11]) -> Block {
     // SAFETY: Same invariant as the parent function
-    unsafe { aes_enc::<13>(block, rk) }
+    unsafe { aes_encrypt::<11>(block, rk) }
 }
 
 #[target_feature(enable = "zkne")]
-pub unsafe fn aes256(block: Block, rk: &[RoundKey; 15]) -> Block {
+pub unsafe fn aes196_encrypt(block: Block, rk: &[RoundKey; 13]) -> Block {
     // SAFETY: Same invariant as the parent function
-    unsafe { aes_enc::<15>(block, rk) }
+    unsafe { aes_encrypt::<13>(block, rk) }
+}
+
+#[target_feature(enable = "zkne")]
+pub unsafe fn aes256_encrypt(block: Block, rk: &[RoundKey; 15]) -> Block {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_encrypt::<15>(block, rk) }
+}
+
+#[target_feature(enable = "zknd")]
+pub unsafe fn aes128_decrypt(block: Block, rk: &[RoundKey; 11]) -> Block {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_decrypt::<11>(block, rk) }
+}
+
+#[target_feature(enable = "zknd")]
+pub unsafe fn aes196_decrypt(block: Block, rk: &[RoundKey; 13]) -> Block {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_decrypt::<13>(block, rk) }
+}
+
+#[target_feature(enable = "zknd")]
+pub unsafe fn aes256_decrypt(block: Block, rk: &[RoundKey; 15]) -> Block {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_decrypt::<15>(block, rk) }
+}
+
+#[target_feature(enable = "zkn")]
+pub unsafe fn aes128_decrypt_key_schedule(rk: &mut [RoundKey; 11]) {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_decrypt_key_schedule::<11>(rk) }
+}
+
+#[target_feature(enable = "zkn")]
+pub unsafe fn aes196_decrypt_key_schedule(rk: &mut [RoundKey; 13]) {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_decrypt_key_schedule::<13>(rk) }
+}
+
+#[target_feature(enable = "zkn")]
+pub unsafe fn aes256_decrypt_key_schedule(rk: &mut [RoundKey; 15]) {
+    // SAFETY: Same invariant as the parent function
+    unsafe { aes_decrypt_key_schedule::<15>(rk) }
 }

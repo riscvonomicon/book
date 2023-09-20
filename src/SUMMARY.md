@@ -5,12 +5,11 @@
 
 - [Cargo and RISC-V](./cargo/mod.md)
   - [Build](./cargo/building.md)
-  - [Run](./cargo/running/mod.md)
+  - [Run & Test](./cargo/running/mod.md)
     - [RISC-V 32-bit](./cargo/running/32bit.md)
     - [RISC-V 64-bit](./cargo/running/64bit.md)
-  - [Test](./cargo/running.md)
-  - [Fuzz](./cargo/running.md)
-  - [Formally Verify](./cargo/running.md)
+  - [Fuzz](./cargo/fuzz.md)
+  - [Formally Verify](./cargo/verify.md)
 
 - [RISC-V Extensions](./extensions/mod.md)
   - [Enabling Extensions](./extensions/enabling.md)
