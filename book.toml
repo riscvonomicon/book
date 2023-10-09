@@ -4,6 +4,9 @@ description = "Reference for using RISC-V in Rust"
 authors = ["Gijs Burghoorn"]
 language = "en"
 
+[build]
+create-missing = false
+
 [output.html]
 site-url = "/riscvonomicon/"
 git-repository-url = "https://github.com/coastalwhite/riscvonomicon"
